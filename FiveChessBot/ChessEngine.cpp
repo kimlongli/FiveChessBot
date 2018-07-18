@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "ChessEngine.h"
 #include "ACSearcher.h"
+#include "PossiblePositionManager.h"
 
 #include <iostream>
 #include <cstdlib>
@@ -19,8 +20,6 @@ namespace ChessEngine {
 #define MAX_SCORE (10000000)
 #define MIN_SCORE (-10000000)
 int DEPTH = 7;
-
-enum Role { HUMAN = 1, COMPUTOR = 2, EMPTY = 0 };
 
 //模式
 vector<string> paterns = {
@@ -80,7 +79,10 @@ stack<Position> moves;
 int scores[2][72];  //保存棋局分数（2个角色72行，包括横竖撇捺）
 int allScore[2];    //局面总评分（2个角色）
 
+//ac算法实现的模式匹配器
 ACSearcher acs;
+
+PossiblePositionManager ppm;
 
 //记录计算结果在哈希表中
 void recordHashItem(int depth, int score, HashItem::Flag flag) {
@@ -151,7 +153,8 @@ Position searchResult;
 
 //根据位置评分，其中board是当前棋盘，p是位置，role是评分角色，比如role是Human则是相对人类评分，比如role是computer则是对于电脑评分
 int evaluatePoint(char board[BOARD_WIDTH][BOARD_WIDTH], Position p) {
-    int result, i, j;
+    int result;
+    unsigned int i, j;
     int role;
 
     result = 0;
@@ -160,7 +163,7 @@ int evaluatePoint(char board[BOARD_WIDTH][BOARD_WIDTH], Position p) {
 
     string lines[4];
     string lines1[4];
-    for (i = max(0, p.x - 5); i < min(BOARD_WIDTH, p.x + 6); i++) {
+    for (i = max(0, p.x - 5); i < (unsigned int)min(BOARD_WIDTH, p.x + 6); i++) {
         if (i != p.x) {
             lines[0].push_back(board[i][p.y] == role ? '1' : board[i][p.y] == 0 ? '0' : '2');
             lines1[0].push_back(board[i][p.y] == role ? '2' : board[i][p.y] == 0 ? '0' : '1');
@@ -170,7 +173,7 @@ int evaluatePoint(char board[BOARD_WIDTH][BOARD_WIDTH], Position p) {
             lines1[0].push_back('1');
         }
     }
-    for (i = max(0, p.y - 5); i < min(BOARD_WIDTH, p.y + 6); i++) {
+    for (i = max(0, p.y - 5); i < (unsigned int)min(BOARD_WIDTH, p.y + 6); i++) {
         if (i != p.y) {
             lines[1].push_back(board[p.x][i] == role ? '1' : board[p.x][i] == 0 ? '0' : '2');
             lines1[1].push_back(board[p.x][i] == role ? '2' : board[p.x][i] == 0 ? '0' : '1');
@@ -180,7 +183,7 @@ int evaluatePoint(char board[BOARD_WIDTH][BOARD_WIDTH], Position p) {
             lines1[1].push_back('1');
         }
     }
-    for (i = p.x - min(min(p.x, p.y), 5), j = p.y - min(min(p.x, p.y), 5); i < min(BOARD_WIDTH, p.x + 6) && j < min(BOARD_WIDTH, p.y + 6); i++, j++) {
+    for (i = p.x - min(min(p.x, p.y), 5), j = p.y - min(min(p.x, p.y), 5); i < (unsigned int)min(BOARD_WIDTH, p.x + 6) && j < (unsigned int)min(BOARD_WIDTH, p.y + 6); i++, j++) {
         if (i != p.x) {
             lines[2].push_back(board[i][j] == role ? '1' : board[i][j] == 0 ? '0' : '2');
             lines1[2].push_back(board[i][j] == role ? '2' : board[i][j] == 0 ? '0' : '1');
@@ -190,7 +193,7 @@ int evaluatePoint(char board[BOARD_WIDTH][BOARD_WIDTH], Position p) {
             lines1[2].push_back('1');
         }
     }
-    for (i = p.x + min(min(p.y, BOARD_WIDTH - 1 - p.x), 5), j = p.y - min(min(p.y, BOARD_WIDTH - 1 - p.x), 5); i >= max(0, p.x - 5) && j < min(BOARD_WIDTH, p.y + 6); i--, j++) {
+    for (i = p.x + min(min(p.y, BOARD_WIDTH - 1 - p.x), 5), j = p.y - min(min(p.y, BOARD_WIDTH - 1 - p.x), 5); i >= (unsigned int)max(0, p.x - 5) && j < (unsigned int)min(BOARD_WIDTH, p.y + 6); i--, j++) {
         if (i != p.x) {
             lines[3].push_back(board[i][j] == role ? '1' : board[i][j] == 0 ? '0' : '2');
             lines1[3].push_back(board[i][j] == role ? '2' : board[i][j] == 0 ? '0' : '1');
@@ -203,12 +206,12 @@ int evaluatePoint(char board[BOARD_WIDTH][BOARD_WIDTH], Position p) {
 
     for (i = 0; i < 4; i++) {
         vector<int> tmp = acs.ACSearch(lines[i]);
-        for (j = 0; j < (int)tmp.size(); j++) {
+        for (j = 0; j < tmp.size(); j++) {
             result += paternScores[tmp[j]];
         }
 
         tmp = acs.ACSearch(lines1[i]);
-        for (j = 0; j < (int)tmp.size(); j++) {
+        for (j = 0; j < tmp.size(); j++) {
             result += paternScores[tmp[j]];
         }
     }
@@ -237,7 +240,7 @@ void updateScore(char board[BOARD_WIDTH][BOARD_WIDTH], Position p) {
 
     string lines[4];
     string lines1[4];
-    int i, j;
+    unsigned int i, j;
     int role = HUMAN;
 
     //竖
@@ -278,12 +281,12 @@ void updateScore(char board[BOARD_WIDTH][BOARD_WIDTH], Position p) {
     //计算分数
     for (i = 0; i < 4; i++) {
         vector<int> result = acs.ACSearch(lines[i]);
-        for (j = 0; j < (int)result.size(); j++) {
+        for (j = 0; j < result.size(); j++) {
             lineScore[i] += paternScores[result[j]];
         }
 
         result = acs.ACSearch(lines1[i]);
-        for (j = 0; j < (int)result.size(); j++) {
+        for (j = 0; j < result.size(); j++) {
             line1Score[i] += paternScores[result[j]];
         }
     }
@@ -338,55 +341,6 @@ void updateScore(char board[BOARD_WIDTH][BOARD_WIDTH], Position p) {
     }
 }
 
-
-//生成下一步可以走的位置
-set<Position> createPossiblePosition(char board[BOARD_WIDTH][BOARD_WIDTH]) {
-    int i, j;
-
-    set<Position> possiblePossitions;
-    for (i = 0; i < BOARD_WIDTH; i++) {
-        for (j = 0; j < BOARD_WIDTH; j++) {
-            if (board[i][j] != 0) {
-                //left
-                if (i > 0 && board[i - 1][j] == 0) {
-                    possiblePossitions.insert(Position(i - 1, j, evaluatePoint(board, Position(i - 1, j))));
-                }
-                //right
-                if (i < BOARD_WIDTH - 1 && board[i + 1][j] == 0) {
-                    possiblePossitions.insert(Position(i + 1, j, evaluatePoint(board, Position(i + 1, j))));
-                }
-                //up
-                if (j > 0 && board[i][j - 1] == 0) {
-                    possiblePossitions.insert(Position(i, j - 1, evaluatePoint(board, Position(i, j - 1))));
-                }
-                //down
-                if (j < BOARD_WIDTH - 1 && board[i][j + 1] == 0) {
-                    possiblePossitions.insert(Position(i, j + 1, evaluatePoint(board, Position(i, j + 1))));
-                }
-                //left up
-                if (i > 0 && j > 0 && board[i - 1][j - 1] == 0) {
-                    possiblePossitions.insert(Position(i - 1, j - 1, evaluatePoint(board, Position(i - 1, j - 1))));
-                }
-                //left down
-                if (i < BOARD_WIDTH - 1 && j > 0 && board[i + 1][j - 1] == 0) {
-                    possiblePossitions.insert(Position(i + 1, j - 1, evaluatePoint(board, Position(i + 1, j - 1))));
-                }
-                //right up
-                if (i > 0 && j < BOARD_WIDTH - 1 && board[i - 1][j + 1] == 0) {
-                    possiblePossitions.insert(Position(i - 1, j + 1, evaluatePoint(board, Position(i - 1, j + 1))));
-                }
-                //right down
-                if (i < BOARD_WIDTH - 1 && j < BOARD_WIDTH - 1 && board[i + 1][j + 1] == 0) {
-                    possiblePossitions.insert(Position(i + 1, j + 1, evaluatePoint(board, Position(i + 1, j + 1))));
-                }
-
-            }
-        }
-    }
-
-    return possiblePossitions;
-}
-
 //alpha-beta剪枝
 int abSearch(char board[BOARD_WIDTH][BOARD_WIDTH], int depth, int alpha, int beta, Role currentSearchRole) {
     HashItem::Flag flag = HashItem::ALPHA;
@@ -412,23 +366,39 @@ int abSearch(char board[BOARD_WIDTH][BOARD_WIDTH], int depth, int alpha, int bet
         return score1 - score2;
     }
 
-    set<Position> possiblePossitions = createPossiblePosition(board);
+    //set<Position> possiblePossitions = createPossiblePosition(board);
 
 
     int count = 0;
-    while (!possiblePossitions.empty()) {
-        Position p = *possiblePossitions.begin();
+    set<Position> possiblePositions;
+    set<Position> tmpPossiblePositions = ppm.GetCurrentPossiblePositions();
 
-        possiblePossitions.erase(possiblePossitions.begin());
+    //对当前可能出现的位置进行粗略评分
+    set<Position>::iterator iter;
+    for (iter = tmpPossiblePositions.begin(); iter != tmpPossiblePositions.end(); iter++) {
+        possiblePositions.insert(Position(iter->x, iter->y, evaluatePoint(board, *iter)));
+    }
+
+    while (!possiblePositions.empty()) {
+        Position p = *possiblePositions.begin();
+
+        possiblePositions.erase(possiblePositions.begin());
+
         //放置棋子
         board[p.x][p.y] = currentSearchRole;
         currentZobristValue ^= boardZobristValue[currentSearchRole - 1][p.x][p.y];
         updateScore(board, p);
 
+        //增加可能出现的位置
+        p.score = 0;
+        ppm.AddPossiblePositions(board, p);
 
         int val = -abSearch(board, depth - 1, -beta, -alpha, currentSearchRole == HUMAN ? COMPUTOR : HUMAN);
         if (depth == DEPTH)
             cout << "score(" << p.x << "," << p.y << "):" << val << endl;
+        
+        //取消上一次增加的可能出现的位置
+        ppm.Rollback();
 
         //取消放置
         board[p.x][p.y] = 0;
@@ -550,6 +520,9 @@ string takeBack() {
     board[previousPosition.x][previousPosition.y] = EMPTY;
     updateScore(board, previousPosition);
 
+    ppm.Rollback();
+    ppm.Rollback();
+
     string resultStr;
     int i, j;
     for (i = 0; i < BOARD_WIDTH; i++) {
@@ -585,14 +558,18 @@ string reset(int role) {
         hashItems[i].flag = HashItem::EMPTY;
     }
 
+    //初始化棋盘
+    memset(board, EMPTY, BOARD_WIDTH * BOARD_WIDTH * sizeof(char));
+
+    //清楚上一局可能出现的位置
+    ppm.RemoveAll();
 
     //用户先走
     if (role == 0) {
-        memset(board, EMPTY, BOARD_WIDTH * BOARD_WIDTH * sizeof(char));
+        // do nothing
     }
     //电脑先走
     else if (role == 1) {
-        memset(board, EMPTY, BOARD_WIDTH * BOARD_WIDTH * sizeof(char));
         currentZobristValue ^= boardZobristValue[COMPUTOR - 1][7][7];
         board[7][7] = COMPUTOR;
         updateScore(board, Position(7, 7));
@@ -600,9 +577,10 @@ string reset(int role) {
         moves.push(Position(7, 7));
         searchResult = Position(7, 7);
 
+        ppm.AddPossiblePositions(board, Position(7, 7));
+
         //第一步默认走7，7的位置
         chs[7 + 7 * 15] = '2';
-        return chs;
     }
 
     winner = -1;
@@ -624,17 +602,22 @@ Position getLastPosition() {
 string nextStep(int x, int y) {
 
     moves.push(Position(x, y));
-
+    
     board[x][y] = HUMAN;
     currentZobristValue ^= boardZobristValue[HUMAN - 1][x][y];
     updateScore(board, Position(x, y));
-    //printBoard(board);
+
+    //增加可能出现的位置
+    ppm.AddPossiblePositions(board, Position(x, y));
 
     Position result = getAGoodMove(board);
+
     board[result.x][result.y] = COMPUTOR;
     currentZobristValue ^= boardZobristValue[COMPUTOR - 1][result.x][result.y];
     updateScore(board, result);
-    //printBoard(board);
+
+    //增加可能出现的位置
+    ppm.AddPossiblePositions(board, result);
 
     //若双方还未决出胜负，则把棋子位置加入到历史记录中
     if(winner == -1)
